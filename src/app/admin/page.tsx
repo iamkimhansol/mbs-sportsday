@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, onSnapshot, query, orderBy, deleteDoc, doc, writeBatch, getDocs, setDoc, Timestamp } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, deleteDoc, doc, writeBatch, getDocs, setDoc, Timestamp, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Song } from "@/lib/music";
-import { Trash2, ShieldCheck, LogOut, Loader2, Copy, FileDown, Check, Save, Clock, Calendar } from "lucide-react";
+import { Song, getMusicDuration } from "@/lib/music";
+import { Trash2, ShieldCheck, LogOut, Loader2, Copy, FileDown, Check, Save, Clock, Calendar, Users, ListMusic, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface AppSettings {
@@ -25,10 +25,13 @@ export default function AdminPage() {
     endTime: "",
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState(0);
+  const [isMigrating, setIsMigrating] = useState(false);
 
   useEffect(() => {
     if (!isAuthorized) return;
 
+    // 1. 노래 목록 가져오기
     const q = query(collection(db, "songs"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, 
       (snapshot) => {
@@ -47,6 +50,7 @@ export default function AdminPage() {
       }
     );
 
+    // 2. 설정 가져오기
     const unsubSettings = onSnapshot(doc(db, "settings", "recommendation"), (doc) => {
       if (doc.exists()) {
         const data = doc.data();
@@ -57,11 +61,57 @@ export default function AdminPage() {
       }
     });
 
+    // 3. 접속자 수 가져오기 (최근 5분 이내 활동 기준)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const presenceQ = query(collection(db, "presence"), where("lastActive", ">=", fiveMinutesAgo));
+    const unsubPresence = onSnapshot(presenceQ, 
+      (snapshot) => {
+        setOnlineUsers(snapshot.size);
+      },
+      (err) => {
+        console.error("Presence listener error:", err);
+        // 권한 에러 등이 발생해도 앱이 죽지 않도록 처리
+      }
+    );
+
     return () => {
       unsubscribe();
       unsubSettings();
+      unsubPresence();
     };
   }, [isAuthorized]);
+
+  const totalDurationMillis = songs.reduce((acc, song) => acc + (song.durationMillis || 0), 0);
+  const totalMinutes = Math.floor(totalDurationMillis / (1000 * 60));
+  const totalSeconds = Math.floor((totalDurationMillis / 1000) % 60);
+
+  const repairData = async () => {
+    const songsToRepair = songs.filter(s => !s.durationMillis);
+    if (songsToRepair.length === 0) {
+      alert("모든 곡의 정보가 이미 정상입니다!");
+      return;
+    }
+
+    if (!confirm(`${songsToRepair.length}곡의 재생 시간 정보를 불러올까요?`)) return;
+
+    setIsMigrating(true);
+    try {
+      const batch = writeBatch(db);
+      for (const song of songsToRepair) {
+        const duration = await getMusicDuration(song.trackId);
+        if (duration > 0) {
+          batch.update(doc(db, "songs", song.id), { durationMillis: duration });
+        }
+      }
+      await batch.commit();
+      alert("데이터 보정이 완료되었습니다!");
+    } catch (err) {
+      console.error(err);
+      alert("보정 중 오류가 발생했습니다.");
+    } finally {
+      setIsMigrating(false);
+    }
+  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -247,6 +297,43 @@ export default function AdminPage() {
             )}
           </button>
         </section>
+
+        {/* Status Dashboard */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div className="bg-white p-6 rounded-3xl border border-blue-50 shadow-sm flex items-center gap-4">
+            <div className="w-14 h-14 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center shadow-sm">
+              <Users size={28} />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-400 uppercase tracking-wider">현재 접속자</p>
+              <h4 className="text-2xl font-black text-slate-800">{onlineUsers}<span className="text-sm ml-1 text-slate-400 font-bold">명</span></h4>
+            </div>
+          </div>
+          <div className="bg-white p-6 rounded-3xl border border-blue-50 shadow-sm flex items-center gap-4">
+            <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center shadow-sm">
+              <ListMusic size={28} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-0.5">
+                <p className="text-sm font-bold text-slate-400 uppercase tracking-wider">총 플레이타임</p>
+                {songs.some(s => !s.durationMillis) && (
+                  <button
+                    onClick={repairData}
+                    disabled={isMigrating}
+                    className="p-1 text-blue-500 hover:bg-blue-50 rounded-md transition-all flex items-center gap-1 group/btn"
+                    title="재생 시간 정보가 없는 곡 보정하기"
+                  >
+                    <RefreshCw size={12} className={isMigrating ? "animate-spin" : "group-hover/btn:rotate-180 transition-transform duration-500"} />
+                    <span className="text-[10px] font-black">정보 보정</span>
+                  </button>
+                )}
+              </div>
+              <h4 className="text-2xl font-black text-slate-800">
+                {totalMinutes}<span className="text-sm mx-0.5 text-slate-400 font-bold">분</span> {totalSeconds}<span className="text-sm ml-0.5 text-slate-400 font-bold">초</span>
+              </h4>
+            </div>
+          </div>
+        </div>
 
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-4">
           <div>

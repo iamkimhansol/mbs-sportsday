@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Song } from "@/lib/music";
 import { motion, AnimatePresence } from "framer-motion";
-import { Music2, Loader2, Calendar, Play, Pause, ChevronUp, ChevronDown } from "lucide-react";
+import { Music2, Loader2, Play, Pause, ChevronUp, ChevronDown } from "lucide-react";
 
 interface PlaylistSectionProps {
   songs: Song[];
@@ -12,7 +12,7 @@ interface PlaylistSectionProps {
 
 export default function PlaylistSection({ songs, loading }: PlaylistSectionProps) {
   const [playingId, setPlayingId] = useState<string | null>(null);
-  const [isAscending, setIsAscending] = useState(true);
+  const [isAscending, setIsAscending] = useState(false); // 최신순 기본 설정
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const togglePreview = (url: string, id: string) => {
@@ -29,7 +29,8 @@ export default function PlaylistSection({ songs, loading }: PlaylistSectionProps
       setPlayingId(id);
     }
   };
-  if (loading) {
+
+  if (loading && songs.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-slate-400">
         <Loader2 className="animate-spin mb-4" size={32} />
@@ -54,26 +55,24 @@ export default function PlaylistSection({ songs, loading }: PlaylistSectionProps
 
   return (
     <div className="space-y-6">
-      {songs.length > 0 && (
-        <div className="flex justify-between items-end px-1">
-          <div>
-            <h2 className="text-xl sm:text-2xl font-black text-slate-800 mb-1.5 flex items-center gap-2">
-              플레이리스트 <span className="text-2xl">🎧</span>
-            </h2>
-            <p className="text-sm text-slate-500 font-medium">우리 학교 학생들의 추천 곡</p>
-          </div>
-          <button
-            onClick={() => setIsAscending(!isAscending)}
-            className="flex items-center gap-1.5 text-xs font-bold text-slate-500 bg-white border border-slate-100 px-3 py-2.5 rounded-xl shadow-sm hover:bg-slate-50 transition-all active:scale-95 flex-shrink-0 mb-1"
-          >
-            {isAscending ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            {isAscending ? "오래된 순" : "최신 순"}
-          </button>
+      <div className="flex justify-between items-end px-1">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-black text-slate-800 mb-1.5 flex items-center gap-2">
+            플레이리스트 <span className="text-2xl">🎧</span>
+          </h2>
+          <p className="text-sm text-slate-500 font-medium">우리 학교 학생들의 추천 곡 ({songs.length}개)</p>
         </div>
-      )}
+        <button
+          onClick={() => setIsAscending(!isAscending)}
+          className="flex items-center gap-1.5 text-xs font-bold text-slate-500 bg-white border border-slate-100 px-3 py-2.5 rounded-xl shadow-sm hover:bg-slate-50 transition-all active:scale-95 flex-shrink-0 mb-1"
+        >
+          {isAscending ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          {isAscending ? "오래된 순" : "최신 순"}
+        </button>
+      </div>
 
-      <AnimatePresence initial={false} mode="popLayout">
-        <div className="space-y-3.5">
+      <div className="space-y-3.5">
+        <AnimatePresence initial={false} mode="popLayout">
           {sortedSongs.map((song, index) => (
             <motion.div
               key={song.id}
@@ -95,6 +94,7 @@ export default function PlaylistSection({ songs, loading }: PlaylistSectionProps
                   src={song.thumbnail}
                   alt={song.title}
                   className="w-full h-full object-cover"
+                  loading="lazy"
                 />
               </div>
               <div className="flex-1 min-w-0">
@@ -116,8 +116,9 @@ export default function PlaylistSection({ songs, loading }: PlaylistSectionProps
               </div>
             </motion.div>
           ))}
-        </div>
-      </AnimatePresence>
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
+

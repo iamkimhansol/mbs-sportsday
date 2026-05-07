@@ -49,7 +49,7 @@ export default function RecommendPage() {
 
   // 2. 노래 목록 가져오기
   useEffect(() => {
-    const q = query(collection(db, "songs"), orderBy("createdAt", "desc"), limit(50));
+    const q = query(collection(db, "songs"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const songsData = snapshot.docs.map((doc) => ({
         id: doc.id,
