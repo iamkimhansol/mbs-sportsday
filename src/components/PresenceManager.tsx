@@ -23,8 +23,8 @@ export default function PresenceManager() {
     // 초기 업데이트
     updatePresence();
 
-    // 1분마다 하트비트
-    const interval = setInterval(updatePresence, 60 * 1000);
+    // 30초마다 하트비트
+    const interval = setInterval(updatePresence, 30 * 1000);
 
     // 종료 시 삭제 시도
     const cleanup = () => {

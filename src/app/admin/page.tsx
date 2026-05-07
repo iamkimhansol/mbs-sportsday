@@ -61,23 +61,40 @@ export default function AdminPage() {
       }
     });
 
-    // 3. 접속자 수 가져오기 (최근 5분 이내 활동 기준)
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-    const presenceQ = query(collection(db, "presence"), where("lastActive", ">=", fiveMinutesAgo));
+    // 3. 접속자 수 가져오기 (실시간 반영 개선)
+    let lastPresenceDocs: any[] = [];
+    const presenceQ = query(collection(db, "presence"));
+    
+    const calculateOnlineUsers = (docs: any[]) => {
+      const twoMinutesAgo = Date.now() - 2 * 60 * 1000;
+      const activeUsers = docs.filter(doc => {
+        const data = doc.data();
+        const lastActive = data.lastActive?.toDate ? data.lastActive.toDate().getTime() : 0;
+        return lastActive >= twoMinutesAgo;
+      });
+      setOnlineUsers(activeUsers.length);
+    };
+
     const unsubPresence = onSnapshot(presenceQ, 
       (snapshot) => {
-        setOnlineUsers(snapshot.size);
+        lastPresenceDocs = snapshot.docs;
+        calculateOnlineUsers(lastPresenceDocs);
       },
       (err) => {
         console.error("Presence listener error:", err);
-        // 권한 에러 등이 발생해도 앱이 죽지 않도록 처리
       }
     );
+
+    // 30초마다 화면상의 접속자 수 다시 계산 (서버 데이터 변경 없어도 시간 경과 반영)
+    const presenceInterval = setInterval(() => {
+      calculateOnlineUsers(lastPresenceDocs);
+    }, 30 * 1000);
 
     return () => {
       unsubscribe();
       unsubSettings();
       unsubPresence();
+      clearInterval(presenceInterval);
     };
   }, [isAuthorized]);
 
