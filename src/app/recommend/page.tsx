@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp, doc } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp, doc, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { searchMusic, MusicTrack, Song } from "@/lib/music";
 import SearchSection from "@/components/SearchSection";
@@ -49,7 +49,7 @@ export default function RecommendPage() {
 
   // 2. 노래 목록 가져오기
   useEffect(() => {
-    const q = query(collection(db, "songs"), orderBy("createdAt", "desc"));
+    const q = query(collection(db, "songs"), orderBy("createdAt", "desc"), limit(50));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const songsData = snapshot.docs.map((doc) => ({
         id: doc.id,
@@ -85,14 +85,6 @@ export default function RecommendPage() {
     }
   };
 
-  if (!isInitialized) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#fcfdff]">
-        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
   return (
     <main className="min-h-screen bg-[#fcfdff]">
       {/* Top Navigation Bar */}
@@ -115,23 +107,30 @@ export default function RecommendPage() {
         </div>
       </nav>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="pt-24 pb-32 px-4 max-w-2xl mx-auto space-y-12"
-      >
-        <section className="space-y-6">
-          <div className="px-1">
-            <h2 className="text-2xl font-black text-slate-800 mb-2">노래 찾기 🔍</h2>
-            <p className="text-sm text-slate-500 font-medium">플레이리스트에 추가할 곡을 검색해 보세요.</p>
-          </div>
-          <SearchSection onAddSong={addSong} />
-        </section>
+      {!isInitialized ? (
+        <div className="pt-32 flex flex-col items-center justify-center gap-4">
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-slate-500 font-bold animate-pulse">설정을 불러오는 중...</p>
+        </div>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="pt-24 pb-32 px-4 max-w-2xl mx-auto space-y-12"
+        >
+          <section className="space-y-6">
+            <div className="px-1">
+              <h2 className="text-2xl font-black text-slate-800 mb-2">노래 찾기 🔍</h2>
+              <p className="text-sm text-slate-500 font-medium">플레이리스트에 추가할 곡을 검색해 보세요.</p>
+            </div>
+            <SearchSection onAddSong={addSong} />
+          </section>
 
-        <section>
-          <PlaylistSection songs={songs} loading={loading} />
-        </section>
-      </motion.div>
+          <section>
+            <PlaylistSection songs={songs} loading={loading} />
+          </section>
+        </motion.div>
+      )}
 
       {/* Notifications */}
       <AnimatePresence>

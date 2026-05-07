@@ -59,7 +59,7 @@ export default function SearchSection({ onAddSong }: SearchSectionProps) {
         <button
           type="submit"
           disabled={isSearching}
-          className="absolute right-3 top-2 bottom-2 px-5 gradient-bg text-white rounded-2xl font-bold text-sm shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
+          className="absolute right-3 top-2 bottom-2 px-5 bg-blue-600 text-white rounded-2xl font-bold text-sm shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
         >
           {isSearching ? <Loader2 className="animate-spin" size={20} /> : "검색"}
         </button>

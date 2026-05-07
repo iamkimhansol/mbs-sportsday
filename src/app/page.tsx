@@ -79,10 +79,7 @@ export default function Home() {
           className="max-w-2xl w-full"
         >
           {/* Hero / Landing Section */}
-          <section className="relative overflow-hidden gradient-bg rounded-[2.5rem] p-10 sm:p-14 text-white shadow-2xl shadow-blue-100 w-full">
-            <div className="absolute top-0 right-0 -mr-16 -mt-16 w-80 h-80 bg-white/10 rounded-full blur-3xl"></div>
-            <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-80 h-80 bg-white/5 rounded-full blur-3xl"></div>
-
+          <section className="relative overflow-hidden bg-blue-600 rounded-[2.5rem] p-10 sm:p-14 text-white shadow-2xl shadow-blue-100 w-full">
             <div className="relative z-10 space-y-8">
               <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/20">
                 <Music size={18} />
