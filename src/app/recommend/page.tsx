@@ -101,7 +101,7 @@ export default function RecommendPage() {
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white">
               <Music size={16} strokeWidth={2.5} />
             </div>
-            <span className="font-black text-slate-800 tracking-tight">MSB PLAY</span>
+            <span className="font-black text-slate-800 tracking-tight">노래 추천페이지</span>
           </div>
           <div className="w-20"></div> {/* Spacer for balance */}
         </div>

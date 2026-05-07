@@ -50,7 +50,7 @@ export default function PlaylistSection({ songs, loading }: PlaylistSectionProps
     );
   }
 
-  const sortedSongs = isAscending ? [...songs] : [...songs].reverse();
+  const sortedSongs = isAscending ? [...songs].reverse() : [...songs];
 
   return (
     <div className="space-y-6">
