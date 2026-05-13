@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc, writeBatch, getDocs, setDoc, Timestamp, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Song, getMusicDuration } from "@/lib/music";
-import { Trash2, ShieldCheck, LogOut, Loader2, Copy, FileDown, Check, Save, Clock, Calendar, Users, ListMusic, RefreshCw } from "lucide-react";
+import { Trash2, ShieldCheck, LogOut, Loader2, Copy, FileDown, Check, Save, Clock, Calendar, Users, ListMusic, RefreshCw, Play, Pause } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface AppSettings {
@@ -27,6 +27,9 @@ export default function AdminPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState(0);
   const [isMigrating, setIsMigrating] = useState(false);
+  const [isRemovingDuplicates, setIsRemovingDuplicates] = useState(false);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (!isAuthorized) return;
@@ -95,6 +98,10 @@ export default function AdminPage() {
       unsubSettings();
       unsubPresence();
       clearInterval(presenceInterval);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
     };
   }, [isAuthorized]);
 
@@ -127,6 +134,70 @@ export default function AdminPage() {
       alert("보정 중 오류가 발생했습니다.");
     } finally {
       setIsMigrating(false);
+    }
+  };
+
+  const removeDuplicates = async () => {
+    const trackMap = new Map<string, Song[]>();
+    
+    // trackId별로 그룹화
+    songs.forEach(song => {
+      const list = trackMap.get(song.trackId) || [];
+      list.push(song);
+      trackMap.set(song.trackId, list);
+    });
+
+    const duplicates: Song[] = [];
+    trackMap.forEach((group) => {
+      if (group.length > 1) {
+        // createdAt 기준으로 정렬 (가장 오래된 것이 인덱스 0으로 오도록)
+        // createdAt이 없는 경우를 대비해 fallback 처리
+        const sorted = [...group].sort((a, b) => {
+          const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+          const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+          return timeA - timeB;
+        });
+        
+        // 첫 번째 항목(가장 먼저 추가된 것)을 제외한 나머지를 삭제 대상으로 선정
+        duplicates.push(...sorted.slice(1));
+      }
+    });
+
+    if (duplicates.length === 0) {
+      alert("중복된 노래가 없습니다!");
+      return;
+    }
+
+    if (!confirm(`중복된 노래 ${duplicates.length}곡을 제거할까요? (가장 먼저 추가된 곡만 남습니다)`)) return;
+
+    setIsRemovingDuplicates(true);
+    try {
+      const batch = writeBatch(db);
+      duplicates.forEach(song => {
+        batch.delete(doc(db, "songs", song.id));
+      });
+      await batch.commit();
+      alert(`중복된 노래 ${duplicates.length}곡이 성공적으로 제거되었습니다!`);
+    } catch (err) {
+      console.error(err);
+      alert("중복 제거 중 오류가 발생했습니다.");
+    } finally {
+      setIsRemovingDuplicates(false);
+    }
+  };
+
+  const togglePreview = (url: string, id: string) => {
+    if (playingId === id) {
+      audioRef.current?.pause();
+      setPlayingId(null);
+    } else {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      audioRef.current = new Audio(url);
+      audioRef.current.play();
+      audioRef.current.onended = () => setPlayingId(null);
+      setPlayingId(id);
     }
   };
 
@@ -357,13 +428,23 @@ export default function AdminPage() {
             <h2 className="text-2xl font-bold text-slate-800">추천 목록 관리</h2>
             <p className="text-slate-500">현재 총 {songs.length}곡이 추천되었습니다.</p>
           </div>
-          <button
-            onClick={clearPlaylist}
-            disabled={songs.length === 0}
-            className="px-6 py-2 bg-red-50 text-red-600 border border-red-100 rounded-xl font-semibold hover:bg-red-600 hover:text-white transition-all disabled:opacity-50"
-          >
-            플레이리스트 초기화
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={removeDuplicates}
+              disabled={songs.length === 0 || isRemovingDuplicates}
+              className="px-6 py-2 bg-blue-50 text-blue-600 border border-blue-100 rounded-xl font-semibold hover:bg-blue-600 hover:text-white transition-all disabled:opacity-50 flex items-center gap-2"
+            >
+              {isRemovingDuplicates ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
+              중복 노래 제거
+            </button>
+            <button
+              onClick={clearPlaylist}
+              disabled={songs.length === 0}
+              className="px-6 py-2 bg-red-50 text-red-600 border border-red-100 rounded-xl font-semibold hover:bg-red-600 hover:text-white transition-all disabled:opacity-50"
+            >
+              플레이리스트 초기화
+            </button>
+          </div>
         </div>
 
         {/* Export Actions */}
@@ -432,12 +513,28 @@ export default function AdminPage() {
                         <h3 className="font-semibold text-slate-800 line-clamp-1">{song.title}</h3>
                         <p className="text-sm text-slate-500 truncate">{song.artist}</p>
                       </div>
-                      <button
-                        onClick={() => deleteSong(song.id)}
-                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                      >
-                        <Trash2 size={20} />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {song.previewUrl && (
+                          <button
+                            onClick={() => togglePreview(song.previewUrl, song.id)}
+                            className={`p-2 rounded-full transition-all ${
+                              playingId === song.id 
+                                ? "bg-blue-600 text-white" 
+                                : "text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                            }`}
+                            title="미리듣기"
+                          >
+                            {playingId === song.id ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => deleteSong(song.id)}
+                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                          title="삭제"
+                        >
+                          <Trash2 size={20} />
+                        </button>
+                      </div>
                     </motion.div>
                   ))}
                 </AnimatePresence>
